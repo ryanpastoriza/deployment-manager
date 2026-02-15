@@ -13,6 +13,7 @@ from typing import Optional
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
+from __init__ import __version__
 from config import ConfigManager
 from validators import SystemValidator
 from services import ServiceManager, ServiceStatus
@@ -173,6 +174,7 @@ class DeploymentManager:
 
 # CLI Commands
 @click.group(invoke_without_command=True)
+@click.version_option(version=__version__, prog_name="Woosoo Deployment Manager")
 @click.option(
     "--project-root",
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
