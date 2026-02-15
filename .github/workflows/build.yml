@@ -1,0 +1,324 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # =====================
+  # Job 1: Lint and Test
+  # =====================
+  test:
+    name: Test on Python ${{ matrix.python-version }}
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r deployment_manager/requirements.txt
+          pip install pytest pytest-cov flake8 black
+
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 deployment_manager --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 deployment_manager --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+
+      - name: Check code formatting with Black
+        run: |
+          black --check deployment_manager/
+
+      - name: Run tests
+        if: always()  # Run tests even if linting fails
+        run: |
+          # When tests are added:
+          # pytest --cov=deployment_manager --cov-report=xml --cov-report=term
+          # For now, just validate imports
+          python -c "from deployment_manager.main import cli; print('Import check passed')"
+          python -c "from deployment_manager.config import ConfigManager; print('Config import passed')"
+          python -c "from deployment_manager.services import ServiceManager; print('Services import passed')"
+          python -c "from deployment_manager.validators import SystemValidator; print('Validators import passed')"
+
+      - name: Upload coverage reports
+        if: matrix.python-version == '3.12' && always()
+        uses: codecov/codecov-action@v4
+        continue-on-error: true
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  # =====================
+  # Job 2: Build Executable
+  # =====================
+  build:
+    name: Build Executable
+    needs: test
+    runs-on: windows-latest
+    if: github.event_name == 'push' || startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r deployment_manager/requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: |
+          python deployment_manager/build_exe.py
+
+      - name: Verify executable
+        run: |
+          if (Test-Path "dist\deployment-manager\deployment-manager.exe") {
+            Write-Output "✅ Executable built successfully"
+            & "dist\deployment-manager\deployment-manager.exe" --version
+          } else {
+            Write-Error "❌ Executable not found"
+            exit 1
+          }
+
+      - name: Package executable
+        run: |
+          # Create release package with executable and required files
+          $version = python -c "from deployment_manager import __version__; print(__version__)"
+          $packageName = "deployment-manager-$version-windows-x64"
+          
+          # Create package directory
+          New-Item -ItemType Directory -Force -Path "release\$packageName"
+          
+          # Copy executable
+          Copy-Item -Recurse "dist\deployment-manager\*" "release\$packageName\"
+          
+          # Copy essential files
+          Copy-Item "README.md" "release\$packageName\"
+          Copy-Item "LICENSE" "release\$packageName\"
+          Copy-Item "CHANGELOG.md" "release\$packageName\"
+          Copy-Item "deployment.config.env.template" "release\$packageName\"
+          Copy-Item -Recurse "bin" "release\$packageName\"
+          Copy-Item -Recurse "docs" "release\$packageName\"
+          Copy-Item -Recurse "examples" "release\$packageName\"
+          
+          # Create ZIP
+          Compress-Archive -Path "release\$packageName" -DestinationPath "release\$packageName.zip"
+          
+          Write-Output "📦 Package created: $packageName.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-manager-windows-x64
+          path: release/*.zip
+          retention-days: 30
+
+  # =====================
+  # Job 3: Create Release
+  # =====================
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-manager-windows-x64
+          path: release/
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "Version: $version"
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          # Extract changelog section for this version
+          $version = "${{ steps.get_version.outputs.version }}"
+          $changelogContent = Get-Content CHANGELOG.md -Raw
+          
+          # Find section for this version
+          $pattern = "(?s)## \[$version\].*?(?=## \[|$)"
+          if ($changelogContent -match $pattern) {
+            $versionChangelog = $matches[0]
+            # Escape for GitHub Actions
+            $versionChangelog = $versionChangelog -replace '%', '%25' -replace '\r\n', '%0D%0A' -replace '\n', '%0A'
+            "changelog=$versionChangelog" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "changelog=See CHANGELOG.md for details" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "release/*.zip"
+          body: |
+            # Woosoo Deployment Manager v${{ steps.get_version.outputs.version }}
+            
+            ## 📦 Installation
+            
+            **Download:** `deployment-manager-${{ steps.get_version.outputs.version }}-windows-x64.zip`
+            
+            **Quick Start:**
+            1. Extract ZIP file
+            2. Copy `deployment.config.env.template` to `deployment.config.env`
+            3. Edit configuration with your values
+            4. Run `deployment-manager.exe --help`
+            
+            ## 📝 Changelog
+            
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ## 📚 Documentation
+            
+            - [User Guide](docs/COMPREHENSIVE.md)
+            - [Installation Guide](docs/INSTALLATION.md)
+            - [Configuration Reference](docs/CONFIGURATION.md)
+            - [Troubleshooting](docs/TROUBLESHOOTING.md)
+            
+            ## ⚙️ System Requirements
+            
+            - Windows 10/11 or Windows Server 2019+
+            - Python 3.11+ (if running from source)
+            - Administrative privileges for service installation
+            
+            ## 🔗 Links
+            
+            - [GitHub Repository](https://github.com/${{ github.repository }})
+            - [Issue Tracker](https://github.com/${{ github.repository }}/issues)
+            - [Documentation](https://github.com/${{ github.repository }}/tree/main/docs)
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # =====================
+  # Job 4: Validate Documentation
+  # =====================
+  docs:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for broken links in Markdown
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          config-file: '.github/markdown-link-check-config.json'
+        continue-on-error: true
+
+      - name: Validate Markdown formatting
+        uses: DavidAnson/markdownlint-cli2-action@v15
+        with:
+          globs: '**/*.md'
+        continue-on-error: true
+
+      - name: Check documentation completeness
+        run: |
+          # Check required documentation files exist
+          REQUIRED_DOCS=(
+            "README.md"
+            "docs/COMPREHENSIVE.md"
+            "docs/REQUIREMENTS.md"
+            "docs/INSTALLATION.md"
+            "docs/CONFIGURATION.md"
+            "docs/TROUBLESHOOTING.md"
+            "docs/CONTRIBUTING.md"
+            "CHANGELOG.md"
+            "LICENSE"
+          )
+          
+          MISSING_DOCS=()
+          for doc in "${REQUIRED_DOCS[@]}"; do
+            if [ ! -f "$doc" ]; then
+              MISSING_DOCS+=("$doc")
+            fi
+          done
+          
+          if [ ${#MISSING_DOCS[@]} -eq 0 ]; then
+            echo "✅ All required documentation files present"
+          else
+            echo "❌ Missing documentation files:"
+            printf '%s\n' "${MISSING_DOCS[@]}"
+            exit 1
+          fi
+
+  # =====================
+  # Job 5: Security Scan
+  # =====================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit
+
+      - name: Check for known vulnerabilities with Safety
+        run: |
+          safety check --file=deployment_manager/requirements.txt
+        continue-on-error: true
+
+      - name: Run Bandit security linter
+        run: |
+          bandit -r deployment_manager/ -f json -o bandit-report.json
+        continue-on-error: true
+
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+          retention-days: 30

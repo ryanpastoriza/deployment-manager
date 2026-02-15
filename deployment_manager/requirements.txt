@@ -1,0 +1,25 @@
+# Woosoo Deployment Manager Dependencies
+
+# Interface
+textual>=0.50.0           # Modern TUI framework
+rich>=13.7.0              # Beautiful terminal output
+
+# Windows Integration
+pywin32>=306              # Windows API
+psutil>=5.9.0             # System monitoring
+
+# Configuration
+python-dotenv>=1.0.0      # .env file handling
+pydantic>=2.5.0           # Config validation
+PyYAML>=6.0.1             # YAML support
+
+# Networking
+requests>=2.31.0          # HTTP client
+websocket-client>=1.7.0   # WebSocket testing
+
+# Utilities
+click>=8.1.7              # CLI framework
+click-default-group>=1.2.4
+
+# Build (development only)
+pyinstaller>=6.3.0

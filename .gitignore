@@ -1,0 +1,101 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Configuration files with secrets
+deployment.config.env
+*.config.env
+!*.config.env.template
+!*.config.env.example
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Backups
+backups/
+*.backup
+*.bak
+
+# Certificates (private keys)
+*.key
+*.pem
+!mkcert.exe
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.temp
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Build artifacts
+*.exe
+!bin/nssm/win64/nssm.exe
+!bin/nssm/win32/nssm.exe
+!bin/mkcert/mkcert.exe
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Node modules (if any)
+node_modules/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets
+secrets/
+*.secret
