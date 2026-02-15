@@ -17,26 +17,26 @@ assets_dir.mkdir(exist_ok=True)
 
 # Build configuration
 build_args = [
-    str(script_dir / 'main.py'),
-    '--onefile',
-    '--console',  # Keep console window for output
-    '--name=woosoo-deploy-manager',
-    '--clean',
-    '--noconfirm',
+    str(script_dir / "main.py"),
+    "--onefile",
+    "--console",  # Keep console window for output
+    "--name=woosoo-deploy-manager",
+    "--clean",
+    "--noconfirm",
     # Hidden imports
-    '--hidden-import=win32timezone',
-    '--hidden-import=win32api',
-    '--hidden-import=win32con',
-    '--hidden-import=win32event',
-    '--hidden-import=win32evtlog',
-    '--hidden-import=win32service',
-    '--hidden-import=win32serviceutil',
-    '--hidden-import=servicemanager',
+    "--hidden-import=win32timezone",
+    "--hidden-import=win32api",
+    "--hidden-import=win32con",
+    "--hidden-import=win32event",
+    "--hidden-import=win32evtlog",
+    "--hidden-import=win32service",
+    "--hidden-import=win32serviceutil",
+    "--hidden-import=servicemanager",
     # Add icon if exists
 ]
 
 if icon_path.exists():
-    build_args.append(f'--icon={icon_path}')
+    build_args.append(f"--icon={icon_path}")
 
 print("=" * 60)
 print("Building Woosoo Deployment Manager Executable")
@@ -51,7 +51,7 @@ print()
 # Run PyInstaller
 try:
     PyInstaller.__main__.run(build_args)
-    
+
     print()
     print("=" * 60)
     print("Build Complete!")
@@ -65,7 +65,7 @@ try:
     print("  woosoo-deploy-manager.exe start all          # Start all services")
     print("  woosoo-deploy-manager.exe --help             # Show help")
     print()
-    
+
 except Exception as e:
     print()
     print("=" * 60)
