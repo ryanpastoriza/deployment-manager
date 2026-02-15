@@ -18,9 +18,9 @@ assets_dir.mkdir(exist_ok=True)
 # Build configuration
 build_args = [
     str(script_dir / "main.py"),
-    "--onefile",
+    "--onedir",  # Create directory with dependencies
     "--console",  # Keep console window for output
-    "--name=woosoo-deploy-manager",
+    "--name=deployment-manager",
     "--clean",
     "--noconfirm",
     # Hidden imports
@@ -44,8 +44,8 @@ print("=" * 60)
 print()
 print("Configuration:")
 print(f"  Script: {script_dir / 'main.py'}")
-print(f"  Output: woosoo-deploy-manager.exe")
-print(f"  Type: Single file executable")
+print(f"  Output: deployment-manager.exe")
+print(f"  Type: Directory with dependencies")
 print()
 
 # Run PyInstaller
@@ -57,13 +57,15 @@ try:
     print("Build Complete!")
     print("=" * 60)
     print()
-    print(f"Executable location: {script_dir / 'dist' / 'woosoo-deploy-manager.exe'}")
+    print(
+        f"Executable location: {project_root / 'dist' / 'deployment-manager' / 'deployment-manager.exe'}"
+    )
     print()
     print("Usage:")
-    print("  woosoo-deploy-manager.exe                    # Show dashboard")
-    print("  woosoo-deploy-manager.exe check              # Run pre-flight checks")
-    print("  woosoo-deploy-manager.exe start all          # Start all services")
-    print("  woosoo-deploy-manager.exe --help             # Show help")
+    print("  deployment-manager.exe                    # Show help")
+    print("  deployment-manager.exe validate           # Run pre-flight checks")
+    print("  deployment-manager.exe service status     # Check services")
+    print("  deployment-manager.exe --help             # Show full help")
     print()
 
 except Exception as e:
