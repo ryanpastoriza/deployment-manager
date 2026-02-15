@@ -13,7 +13,9 @@ from typing import Optional
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from __init__ import __version__
+# Import version directly
+__version__ = "2.0.0"
+
 from config import ConfigManager
 from validators import SystemValidator
 from services import ServiceManager, ServiceStatus
